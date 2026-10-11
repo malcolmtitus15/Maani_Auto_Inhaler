@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BreathSync: How the inhaler works (interactive prototype)</title>
+<style>
+:root{
+  --bg:#EEF7F6; --card:#FFFFFF; --ink:#12313A; --muted:#4F6A71; --line:#CFE3E1;
+  --teal:#0E7C86; --teal-d:#0A5961; --lime:#A5CD39; --navy:#1B4A6B; --on-navy:#FFFFFF; --on-teal:#FFFFFF;
+  --amber:#D98E04; --red:#C73B3B; --green:#2A9D4B;
+  --oled:#06161A; --oled-ink:#7FE8EE; --body-fill:#DDEFEE; --metal:#E9EEF0; --metal-line:#8FA6AC;
+  --tint:#E4F3F2; --warn-bg:#FFF3D6; --bad-bg:#FBE3E3; --ok-bg:#E1F4E7;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C1A1D; --card:#142428; --ink:#E4F1F1; --muted:#9DB6BA; --line:#274247;
+    --teal:#2AB5C0; --teal-d:#1B8E98; --lime:#B7DB52; --navy:#7FB2D6; --on-navy:#06161A; --on-teal:#06161A;
+    --amber:#F0B33A; --red:#F07272; --green:#4FD274;
+    --oled:#020B0D; --body-fill:#1D3A3F; --metal:#2B3E43; --metal-line:#6B8A90;
+    --tint:#1A3338; --warn-bg:#3A2F12; --bad-bg:#3D1C1C; --ok-bg:#16351F;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C1A1D; --card:#142428; --ink:#E4F1F1; --muted:#9DB6BA; --line:#274247;
+  --teal:#2AB5C0; --teal-d:#1B8E98; --lime:#B7DB52; --navy:#7FB2D6; --on-navy:#06161A; --on-teal:#06161A;
+  --amber:#F0B33A; --red:#F07272; --green:#4FD274;
+  --oled:#020B0D; --body-fill:#1D3A3F; --metal:#2B3E43; --metal-line:#6B8A90;
+  --tint:#1A3338; --warn-bg:#3A2F12; --bad-bg:#3D1C1C; --ok-bg:#16351F;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif;margin:0;color:var(--teal-d)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) h1,:root:not([data-theme="light"]) h2,:root:not([data-theme="light"]) h3{color:var(--teal)}}
+:root[data-theme="dark"] h1,:root[data-theme="dark"] h2,:root[data-theme="dark"] h3{color:var(--teal)}
+.wrap{max-width:1120px;margin:0 auto;padding:18px 14px 40px}
+.hero{position:relative;padding:6px 0 16px}
+.hero::after{content:"";position:absolute;right:0;top:0;width:22px;height:34px;background:var(--lime);border-radius:0 0 3px 3px}
+.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--teal);font-weight:700}
+.hero h1{font-size:clamp(22px,4.6vw,34px);line-height:1.15;margin:6px 0 8px;padding-right:34px}
+.hero p{margin:0;max-width:760px;color:var(--muted)}
+.grid{display:grid;gap:14px;grid-template-columns:1fr;margin-bottom:14px}
+@media (min-width:880px){.grid{grid-template-columns:1fr 1fr}}
+.stack{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--teal);border-radius:10px;padding:14px 16px;min-width:0}
+.card h2{font-size:18px;margin-bottom:2px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 6px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--tint);border:1px solid var(--line);font-size:12.5px;font-weight:600}
+.chip i{width:9px;height:9px;border-radius:50%;background:var(--metal-line);display:inline-block}
+.chip.awake i{background:var(--teal)} .chip.val i{background:var(--amber)} .chip.fire i{background:var(--green)}
+.chip.lock i{background:var(--amber)} .chip.off i{background:var(--red)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+svg.device{display:block;width:100%;max-width:470px;height:auto;margin:0 auto}
+/* SVG parts */
+.hs{fill:var(--body-fill);stroke:var(--teal-d);stroke-width:2.5}
+.air{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+.can{fill:var(--metal);stroke:var(--metal-line);stroke-width:2}
+.canlbl{fill:var(--lime)}
+.sol{fill:var(--navy);stroke:var(--ink);stroke-width:1.5;transition:stroke .08s}
+.sol.on{stroke:var(--lime);stroke-width:5}
+.coil{stroke:var(--on-navy);opacity:.45;stroke-width:2}
+.rod{fill:var(--metal-line)}
+.stem{fill:var(--metal-line);stroke:none}
+.tube{stroke:var(--metal-line);stroke-width:7;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.esp{fill:var(--teal-d);stroke:var(--ink);stroke-width:1}
+.pin{stroke:var(--metal-line);stroke-width:2}
+.oledbg{fill:var(--oled);stroke:var(--metal-line);stroke-width:1.5}
+.toled{fill:var(--oled-ink);font-family:ui-monospace,Menlo,Consolas,monospace;text-anchor:middle}
+.toled.warn{fill:#FFC857}
+.bat{fill:var(--card);stroke:var(--ink);stroke-width:1.5}
+.sensor{fill:var(--navy);stroke:var(--ink);stroke-width:1}
+.lbl{font-size:11.5px;fill:var(--ink)}
+.lead{stroke:var(--muted);stroke-width:1;fill:none}
+.svgtxt{font-size:10px;fill:#fff;font-weight:700;text-anchor:middle}
+.airlbl{font-size:11px;fill:var(--muted)}
+/* controls */
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.btn{font:inherit;font-weight:700;border-radius:10px;border:2px solid var(--teal);background:var(--card);color:var(--teal-d);padding:10px 8px;min-height:54px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;-webkit-touch-callout:none;line-height:1.2}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn{color:var(--teal)}}
+:root[data-theme="dark"] .btn{color:var(--teal)}
+.btn.primary{background:var(--teal);color:var(--on-teal)}
+.btn.active{outline:3px solid var(--lime);outline-offset:1px;transform:translateY(1px)}
+.btn.small{min-height:40px;padding:6px 10px;font-weight:600;font-size:13.5px;touch-action:manipulation}
+.btn.navy{border-color:var(--navy)}
+.btn:focus-visible,input:focus-visible{outline:3px solid var(--lime);outline-offset:2px}
+.field{margin:12px 0 4px}
+.field label{display:flex;justify-content:space-between;font-weight:600;font-size:13.5px}
+input[type=range]{width:100%;accent-color:var(--teal);margin:6px 0 0}
+.hint{font-size:12.5px;color:var(--muted)}
+.verdict{margin:10px 0;padding:10px 12px;border-radius:8px;border-left:5px solid var(--teal);background:var(--tint);font-weight:600;min-height:3.4em}
+.verdict.ok{background:var(--ok-bg);border-color:var(--green)}
+.verdict.warn{background:var(--warn-bg);border-color:var(--amber)}
+.verdict.bad{background:var(--bad-bg);border-color:var(--red)}
+canvas#chart{width:100%;height:190px;display:block;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+/* flow */
+.flow{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));margin-top:8px}
+.step{border:1.5px dashed var(--line);border-radius:8px;padding:8px 9px;background:var(--card);transition:background .25s,border-color .25s,opacity .25s;opacity:.65}
+.step b{display:flex;align-items:center;gap:7px;font-size:13px}
+.step b span{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--metal-line);color:#fff;font-size:12px;flex:none}
+.step small{display:block;margin-top:3px;color:var(--muted);font-size:12px;line-height:1.3}
+.step.on{opacity:1;border:1.5px solid var(--teal);background:var(--tint)}
+.step.on b span{background:var(--teal);color:var(--on-teal)}
+.step.now{animation:pulse .7s ease-out 1}
+.step.bad{opacity:1;border:1.5px solid var(--red);background:var(--bad-bg)}
+.step.bad b span{background:var(--red);color:#fff}
+@keyframes pulse{0%{box-shadow:0 0 0 0 var(--lime)}100%{box-shadow:0 0 0 12px transparent}}
+@media (prefers-reduced-motion: reduce){.step.now{animation:none}}
+/* tests */
+.tests{display:flex;flex-direction:column;gap:8px}
+.test{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center}
+.test p{margin:0;font-size:13px;color:var(--muted)}
+@media (max-width:520px){.test{grid-template-columns:1fr}}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+/* logs */
+.log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--oled);color:#BFE9EC;border-radius:8px;padding:8px 10px;min-height:150px;max-height:190px;overflow:auto}
+.log div{padding:1px 0;white-space:pre-wrap;word-break:break-word}
+.log .ok{color:#7BE495} .log .warn{color:#FFC857} .log .bad{color:#FF8E8E} .log .info{color:#BFE9EC}
+.log .t{opacity:.55}
+.mc{border:1px solid var(--line);border-radius:14px;padding:10px;background:var(--bg)}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 8px;text-align:center}
+.tile b{display:block;font-size:19px;font-family:Georgia,serif;color:var(--teal-d)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tile b{color:var(--teal)}}
+:root[data-theme="dark"] .tile b{color:var(--teal)}
+.tile.warn{border-color:var(--amber);background:var(--warn-bg)}
+.tile span{font-size:11px;color:var(--muted)}
+.mclist{display:flex;flex-direction:column;gap:5px;min-height:96px}
+.mcrow{display:flex;justify-content:space-between;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:7px;padding:5px 9px;font-size:13px}
+.mcrow.new{animation:pulse .9s ease-out 1}
+.mcrow.alert{border-color:var(--amber);background:var(--warn-bg)}
+.mcrow small{color:var(--muted)}
+.empty{color:var(--muted);font-size:13px;padding:8px}
+.foot{font-size:12.5px;color:var(--muted);margin-top:8px;border-top:1px solid var(--line);padding-top:10px}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="hero">
+    <div class="eyebrow">BREATHSYNC &middot; MAANI AUTO-INHALER</div>
+    <h1>Interactive prototype: how BreathSync works</h1>
+    <p>Breathe in using the controls and watch the simulated device wait for a real inhalation, fire the solenoid, count the dose and report it to the doctor. Then try to fool it with a cough, a blow or a double dose.</p>
+  </header>
+
+  <section class="grid">
+    <!-- DEVICE -->
+    <article class="card">
+      <h2>The device</h2>
+      <p class="sub">Schematic cut-away, not the final housing.</p>
+      <div class="chips">
+        <span class="chip" id="stateChip"><i></i><span id="stateTxt">Asleep</span></span>
+        <span class="chip mono" id="sensorChip">Sensor +0.00 kPa</span>
+      </div>
+      <svg class="device" viewBox="0 0 440 420" role="img" aria-label="Cut-away schematic of the BreathSync inhaler showing the solenoid, canister, ESP32, OLED, LED, battery and pressure sensor">
+        <!-- housing (L-shape) -->
+        <path class="hs" d="M128 150 H242 Q260 150 260 168 V330 H352 Q370 330 370 347 V378 Q370 394 352 394 H128 Q110 394 110 376 V168 Q110 150 128 150 Z"/>
+        <!-- airway -->
+        <rect class="air" x="118" y="346" width="246" height="38" rx="9"/>
+        <!-- air inlet slots -->
+        <line x1="110" y1="356" x2="118" y2="356" stroke="var(--card)" stroke-width="5"/>
+        <line x1="110" y1="374" x2="118" y2="374" stroke="var(--card)" stroke-width="5"/>
+        <!-- air flow animation -->
+        <path id="flowPath" d="M124 374 H358" fill="none" stroke="var(--teal)" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="9 11" opacity="0"/>
+        <!-- nozzle tube + actuator seat -->
+        <rect x="163" y="232" width="44" height="22" rx="4" class="rod"/>
+        <path class="tube" d="M185 254 V362 H199"/>
+        <!-- ESP32 -->
+        <g id="esp">
+          <rect class="esp" x="120" y="250" width="56" height="44" rx="4"/>
+          <g class="pin"><line x1="124" y1="247" x2="124" y2="250"/><line x1="132" y1="247" x2="132" y2="250"/><line x1="140" y1="247" x2="140" y2="250"/><line x1="148" y1="247" x2="148" y2="250"/><line x1="156" y1="247" x2="156" y2="250"/><line x1="164" y1="247" x2="164" y2="250"/><line x1="172" y1="247" x2="172" y2="250"/></g>
+          <text class="svgtxt" x="148" y="276">ESP32</text>
+        </g>
+        <!-- battery -->
+        <rect class="bat" x="120" y="304" width="56" height="26" rx="4"/>
+        <rect x="176" y="311" width="4" height="12" fill="var(--ink)"/>
+        <rect id="batFill" x="123" y="307" width="50" height="20" rx="2" fill="var(--green)"/>
+        <!-- OLED -->
+        <g id="oledG">
+          <rect class="oledbg" x="198" y="250" width="54" height="38" rx="4"/>
+          <text id="oledBat" class="toled warn" x="225" y="259" font-size="6.5"></text>
+          <text id="oledL1" class="toled" x="225" y="275" font-size="15">~200</text>
+          <text id="oledL2" class="toled" x="225" y="284" font-size="6.5">doses left</text>
+        </g>
+        <!-- LED -->
+        <circle id="ledRing" cx="225" cy="313" r="13" fill="var(--green)" opacity="0"/>
+        <circle id="led" cx="225" cy="313" r="8" fill="var(--metal-line)" stroke="var(--ink)" stroke-width="1.5"/>
+        <!-- pressure sensor -->
+        <circle id="sensorRing" cx="238" cy="347" r="11" fill="none" stroke="var(--lime)" stroke-width="3.5" opacity="0"/>
+        <rect class="sensor" x="228" y="341" width="20" height="9" rx="2"/>
+        <!-- plume -->
+        <g id="plume"></g>
+        <!-- canister + plunger -->
+        <g id="plunger"><rect class="rod" x="178" y="40" width="14" height="30"/></g>
+        <g id="canister">
+          <rect class="can" x="150" y="70" width="70" height="152" rx="10"/>
+          <rect class="canlbl" x="150" y="108" width="70" height="44" opacity=".92"/>
+          <text x="185" y="135" text-anchor="middle" font-size="12" font-weight="700" style="fill:#1B4A6B">MDI</text>
+          <rect class="stem" x="178" y="222" width="14" height="12"/>
+        </g>
+        <text id="handTxt" x="232" y="92" font-size="12" font-weight="700" style="fill:var(--amber)" opacity="0">&#8595; by hand</text>
+        <!-- solenoid -->
+        <g>
+          <rect id="solBody" class="sol" x="140" y="8" width="90" height="40" rx="6"/>
+          <g class="coil"><line x1="156" y1="14" x2="156" y2="42"/><line x1="168" y1="14" x2="168" y2="42"/><line x1="180" y1="14" x2="180" y2="42"/><line x1="192" y1="14" x2="192" y2="42"/><line x1="204" y1="14" x2="204" y2="42"/><line x1="216" y1="14" x2="216" y2="42"/></g>
+        </g>
+        <!-- left labels -->
+        <g class="lbl" text-anchor="end">
+          <text x="100" y="32">Solenoid</text>
+          <text x="100" y="124">MDI canister</text>
+          <text x="100" y="274">ESP32</text>
+          <text x="100" y="321">LiPo battery</text>
+          <text x="52" y="346" class="airlbl" text-anchor="end">Air in</text>
+        </g>
+        <g class="lead">
+          <line x1="104" y1="28" x2="140" y2="28"/>
+          <line x1="104" y1="120" x2="150" y2="120"/>
+          <line x1="104" y1="270" x2="120" y2="270"/>
+          <line x1="104" y1="317" x2="120" y2="317"/>
+        </g>
+        <path d="M44 366 H104" stroke="var(--teal)" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <path d="M96 359 L106 366 L96 373" stroke="var(--teal)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- right labels -->
+        <g class="lbl">
+          <text x="270" y="262">OLED: doses left</text>
+          <text x="270" y="299">LED confirmation</text>
+        </g>
+        <g class="lead">
+          <line x1="254" y1="258" x2="266" y2="258"/>
+          <polyline points="234,308 250,295 266,295"/>
+          <polyline points="248,344 262,324 268,324"/>
+        </g>
+        <text class="lbl" x="272" y="328" style="font-size:11.5px">Pressure sensor</text>
+        <text class="airlbl" x="372" y="412" text-anchor="end">Mouthpiece &#8594; patient</text>
+      </svg>
+    </article>
+
+    <!-- CONTROLS -->
+    <article class="card">
+      <h2>You are the patient</h2>
+      <p class="sub">Press and hold to breathe. No press-and-breathe timing needed: the device does the pressing.</p>
+      <div class="row">
+        <button class="btn primary" id="bIn" aria-label="Hold to inhale">&#9660; Hold to inhale</button>
+        <button class="btn navy" id="bOut" aria-label="Hold to blow out">&#9650; Hold to blow out</button>
+        <button class="btn navy" id="bCough" aria-label="Cough">Cough</button>
+      </div>
+      <div class="field">
+        <label for="eff"><span>Breath effort</span><span class="mono" id="effVal">0.60 kPa</span></label>
+        <input type="range" id="eff" min="0.05" max="1" step="0.01" value="0.6">
+        <div class="hint">The device fires above 0.20 kPa. Slide below it to see a weak breath ignored. Keyboard: hold Space to inhale, B to blow out.</div>
+      </div>
+      <div class="verdict" id="verdict" role="status" aria-live="polite">Hold &ldquo;inhale&rdquo; to take a dose. The device fires on your own breath.</div>
+      <canvas id="chart" aria-label="Live mouthpiece pressure chart"></canvas>
+      <div class="hint" style="margin-top:6px">Live mouthpiece pressure (illustrative kPa). The green zone is an inhalation past the fire threshold.</div>
+    </article>
+  </section>
+
+  <!-- FLOW -->
+  <section class="card" style="margin-bottom:14px">
+    <h2>Signal flow, live</h2>
+    <p class="sub">The seven steps from your deck light up as each one happens.</p>
+    <div class="flow" id="flow"></div>
+  </section>
+
+  <section class="grid">
+    <div class="stack">
+      <article class="card">
+        <h2>Safety checks</h2>
+        <p class="sub">Safeguards from the &ldquo;Safety and Reliability&rdquo; slide. Change from the deck: the daily cap is now a warning, not a block, so a severe attack is never refused.</p>
+        <div class="tests">
+          <div class="test"><button class="btn small" id="tCough">1. Valid breath only: cough</button><p>A sharp blow then a brief gasp. Should be rejected.</p></div>
+          <div class="test"><button class="btn small" id="tBlow">1. Valid breath only: blow</button><p>Blowing into the mouthpiece. Wrong direction, should be ignored.</p></div>
+          <div class="test"><button class="btn small" id="tDouble">2. Dose lockout: two inhales</button><p>A second dose within 5 s is blocked. This is only minimum spacing: it never limits total puffs.</p></div>
+          <div class="test"><button class="btn small" id="tAttack">2b. Severe attack: many puffs</button><p>Six inhales just past the lockout (about 40 s). Every dose still fires; after the 4th, a heavy-use warning and an alert to the doctor and caregiver appear.</p></div>
+          <div class="test"><button class="btn small" id="tBatt">3. Manual fallback: battery dies</button><p>Electronics go off, nothing fires. Then press the canister by hand.</p></div>
+        </div>
+        <div class="btnrow">
+          <button class="btn small" id="bManual">Press canister by hand</button>
+        </div>
+      </article>
+      <article class="card">
+        <h2>Device settings</h2>
+        <p class="sub">Set up the situation you want to demo.</p>
+        <div class="field" style="margin-top:0">
+          <label for="bat"><span>Battery</span><span class="mono" id="batVal">85%</span></label>
+          <input type="range" id="bat" min="0" max="100" step="1" value="85">
+        </div>
+        <div class="btnrow">
+          <button class="btn small" id="bNew">New canister (200)</button>
+          <button class="btn small" id="bLow">Nearly empty (22 left)</button>
+          <button class="btn small" id="bDay">Next day</button>
+        </div>
+      </article>
+    </div>
+
+    <div class="stack">
+      <article class="card">
+        <h2>Inside the ESP32</h2>
+        <p class="sub">What the firmware &ldquo;thinks&rdquo;, as a serial monitor.</p>
+        <div class="log" id="log" aria-label="Device serial log"></div>
+      </article>
+      <article class="card">
+        <h2>MobiCare: the doctor&rsquo;s view</h2>
+        <p class="sub">Timestamped history, shared with the patient&rsquo;s consent.</p>
+        <div class="mc">
+          <div class="tiles">
+            <div class="tile"><b id="mcToday">0/4</b><span>doses today (usual max)</span></div>
+            <div class="tile"><b id="mcLeft">~200</b><span>doses left</span></div>
+            <div class="tile"><b id="mcBlocked">0</b><span>stopped attempts</span></div>
+          </div>
+          <div class="mclist" id="mcList"><div class="empty">No doses logged yet.</div></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <p class="foot">Illustrative simulation built from the BreathSync deck. The 0.20 kPa threshold, 120 ms validation window, 5 s lockout, 4-dose usual daily maximum (a warning only, never a block) and 20-dose low warning are demo values, not tested specifications. Real values are for the technical team and a clinician to confirm. The simulator assumes a dose released by hand is not counted, because the deck does not describe a way to detect it.</p>
+</main>
+
+<script>
+(() => {
+"use strict";
+const CFG = { thr:0.20, validate:0.12, lockout:5, heavy:4, low:20, sleep:2.5, full:200 };
+const $ = id => document.getElementById(id);
+const S = {
+  T:0, p:0, hold:null, script:null, eff:0.6,
+  doses:200, shown:200, today:0, total:0, day:1, battery:85, lastFire:-999,
+  ep:null, quiet:99, awake:false,
+  pressT:-1, pressKind:null, released:false,
+  ledColor:null, ledUntil:0, blocked:null, blockUntil:0,
+  flow:[-1,-1,-1,-1,-1,-1,-1], flowBad:-1, flowFresh:-1,
+  hist:[], marks:[], timers:[], plumeEmit:0,
+  stopped:0, logs:[], dosesLog:[], lowBatLogged:false
+};
+
+/* ---------- helpers ---------- */
+const fmt = p => (p<0?'\u2212':'+') + Math.abs(p).toFixed(2) + ' kPa';
+const clock = () => new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+const later = (sec, fn) => S.timers.push({at:S.T+sec, fn});
+function setText(el, v){ if(el.textContent !== v) el.textContent = v; }
+
+function verdict(msg, kind){
+  const v = $('verdict'); v.textContent = msg; v.className = 'verdict ' + (kind||'');
+}
+function log(msg, kind){
+  S.logs.unshift({t:S.T, msg, kind:kind||'info'});
+  if(S.logs.length>12) S.logs.length = 12;
+  const box = $('log'); box.textContent = '';
+  S.logs.forEach(l => {
+    const d = document.createElement('div'); d.className = l.kind;
+    const t = document.createElement('span'); t.className = 't'; t.textContent = 't+' + l.t.toFixed(1) + 's  ';
+    d.appendChild(t); d.appendChild(document.createTextNode(l.msg)); box.appendChild(d);
+  });
+}
+function mark(type){ S.marks.push({t:S.T, type}); }
+
+/* ---------- flow strip ---------- */
+const STEPS = [
+  ['Patient inhales','Pressure drop past threshold'],
+  ['ESP32 confirms','Held 120 ms, right direction'],
+  ['Solenoid fires','MOSFET pulse presses canister'],
+  ['Counter updates','OLED shows doses left'],
+  ['LED confirms','Green LED = dose delivered'],
+  ['Warning shown','Low doses or heavy use'],
+  ['Doctor sees it','Logged to MobiCare']
+];
+const flowEl = $('flow');
+STEPS.forEach((s,i) => {
+  const d = document.createElement('div'); d.className='step'; d.id='st'+i;
+  d.innerHTML = '<b><span>'+(i+1)+'</span>'+s[0]+'</b><small>'+s[1]+'</small>';
+  flowEl.appendChild(d);
+});
+function flowReset(){ S.flow.fill(-1); S.flowBad=-1; }
+function flowStep(n){ S.flow[n-1] = S.T; S.flowFresh = n-1; }
+function renderFlow(){
+  for(let i=0;i<7;i++){
+    const el = $('st'+i);
+    const on = S.flow[i] >= 0;
+    el.classList.toggle('on', on && S.flowBad!==i);
+    el.classList.toggle('bad', S.flowBad===i);
+    const fresh = on && (S.T - S.flow[i] < 0.05);
+    if(fresh){ el.classList.remove('now'); void el.offsetWidth; el.classList.add('now'); }
+  }
+}
+
+/* ---------- MobiCare ---------- */
+function renderMC(newRow){
+  setText($('mcToday'), S.today + '/' + CFG.heavy); $('mcToday').parentElement.classList.toggle('warn', S.today > CFG.heavy);
+  setText($('mcLeft'), '~' + S.doses);
+  setText($('mcBlocked'), String(S.stopped));
+  const list = $('mcList'); list.textContent = '';
+  if(!S.dosesLog.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='No doses logged yet.'; list.appendChild(e); return; }
+  S.dosesLog.slice(0,6).forEach((r,i) => {
+    const d = document.createElement('div');
+    d.className = 'mcrow' + (r.alert?' alert':'') + (i===0 && newRow?' new':'');
+    const a = document.createElement('span'); a.textContent = r.alert ? '\u26A0 ' + r.label : '\u2713 ' + r.label + ' ';
+    if(!r.alert){ const s=document.createElement('small'); s.textContent='~'+r.left+' left'; a.appendChild(s); }
+    const b = document.createElement('small'); b.textContent = 'Day ' + r.day + ' \u00B7 ' + r.time;
+    d.appendChild(a); d.appendChild(b); list.appendChild(d);
+  });
+}
+
+/* ---------- breath episodes ---------- */
+function endEp(){
+  const e = S.ep; S.ep = null;
+  if(e && e.type==='in' && !e.handled && !e.started && e.peak < -0.08){
+    const msg = 'Weak breath (peak ' + fmt(e.peak) + ') ignored: below the ' + CFG.thr.toFixed(2) + ' kPa threshold. Breathe in a little harder.';
+    S.stopped++; mark('rej'); log(msg,'warn'); verdict('\u2715 ' + msg,'warn'); renderMC();
+  }
+}
+function reject(msg){
+  S.ep.handled = true; S.stopped++; mark('rej');
+  log(msg,'bad'); verdict('\u2715 ' + msg,'bad'); renderMC();
+}
+function block(msg, txt, sub){
+  S.ep.handled = true; S.stopped++; mark('block');
+  S.blocked = {txt,sub}; S.blockUntil = S.T + 2.2; S.flowBad = 2;
+  S.ledColor = 'amber'; S.ledUntil = S.T + 0.9;
+  log(msg,'warn'); verdict('\u2715 ' + msg,'warn'); renderMC();
+}
+function attemptFire(){
+  flowStep(2);
+  log('Breath confirmed (held ' + Math.round(S.ep.below*1000) + ' ms). Checking safeguards\u2026','info');
+  const since = S.T - S.lastFire;
+  if(S.doses <= 0) return block('Canister empty: no dose fired. Replace the canister.','EMPTY','refill now');
+  if(since < CFG.lockout) return block('Lockout: last dose was ' + since.toFixed(1) + ' s ago. Wait ' + (CFG.lockout-since).toFixed(1) + ' s. Double dosing prevented.','WAIT','lockout');
+  fire();
+}
+function fire(){
+  S.state = 'fire'; S.pressT = 0; S.pressKind = 'auto'; S.released = false;
+  flowStep(3);
+  log('GPIO high: MOSFET pulses solenoid (150 ms)','ok');
+}
+function pressOffset(t){
+  if(t<0) return 0;
+  if(t<0.06) return 12*t/0.06;
+  if(t<0.2) return 12;
+  if(t<0.4) return 12*(1-(t-0.2)/0.2);
+  return 0;
+}
+function onRelease(){
+  S.plumeEmit = 0.18;
+  if(S.pressKind === 'manual'){
+    const m = 'Dose released by hand. Works with no power, but the device cannot count this one.';
+    log('Manual press: dose released mechanically, not counted','warn'); verdict('\u270B ' + m,'warn');
+    return;
+  }
+  S.doses--; S.today++; S.total++; S.lastFire = S.T;
+  S.battery = Math.max(0.5, S.battery - 0.4);
+  $('bat').value = Math.round(S.battery); setText($('batVal'), Math.round(S.battery)+'%');
+  mark('fire');
+  log('Dose delivered. Count = ' + S.doses,'ok');
+  const heavy = S.today > CFG.heavy;
+  if(heavy) log('Heavy use: ' + S.today + ' doses today (usual max ' + CFG.heavy + '). Dose NOT blocked.','warn');
+  verdict('\u2713 Dose delivered on your own breath. ' + S.doses + ' doses left (estimate).' + (heavy ? ' Heavy use today (' + S.today + ' doses): seek medical help if breathing does not ease. The device never blocks a dose in an attack.' : ''), heavy ? 'warn' : 'ok');
+  later(0.12, () => { S.shown = S.doses; flowStep(4); });
+  later(0.25, () => { flowStep(5); S.ledColor='green'; S.ledUntil = S.T + 1.3; });
+  later(0.4, () => { if((S.doses <= CFG.low && S.doses > 0) || S.today > CFG.heavy){ flowStep(6); log('Warning shown on OLED','warn'); } });
+  later(0.7, () => {
+    S.dosesLog.unshift({day:S.day, time:clock(), label:'Dose delivered', left:S.doses});
+    if(S.doses === CFG.low) S.dosesLog.unshift({day:S.day, time:clock(), label:'Low-dose alert sent', alert:true});
+    if(S.today === CFG.heavy + 1){ S.dosesLog.unshift({day:S.day, time:clock(), label:'Heavy-use alert sent to doctor and caregiver', alert:true}); log('Heavy-use alert sent to doctor and caregiver','warn'); }
+    flowStep(7); renderMC(true); log('Synced to MobiCare','info');
+  });
+}
+
+/* ---------- main tick ---------- */
+function tick(dt){
+  S.T += dt;
+  // breath input
+  let tgt = 0, tau = 0.14;
+  if(S.script){
+    const st = S.script.steps[S.script.i]; tgt = st.t; tau = st.tau || 0.12; S.script.el += dt;
+    if(S.script.el >= st.d){ S.script.el = 0; S.script.i++; if(S.script.i >= S.script.steps.length) S.script = null; }
+  } else if(S.hold === 'in'){ tgt = -S.eff; }
+  else if(S.hold === 'out'){ tgt = S.eff; }
+  S.p += (tgt - S.p) * (1 - Math.exp(-dt/tau));
+  S.p = Math.max(-1.1, Math.min(1.3, S.p));
+  S.hist.push({t:S.T, p:S.p});
+  while(S.hist.length && S.hist[0].t < S.T - 6.5) S.hist.shift();
+  while(S.marks.length && S.marks[0].t < S.T - 6.5) S.marks.shift();
+
+  // timers
+  if(S.timers.length){
+    const due = S.timers.filter(x => x.at <= S.T);
+    S.timers = S.timers.filter(x => x.at > S.T);
+    due.forEach(x => x.fn());
+  }
+  // press animation
+  if(S.pressT >= 0){
+    S.pressT += dt;
+    if(!S.released && S.pressT >= 0.06){ S.released = true; onRelease(); }
+    if(S.pressT >= 0.4){ S.pressT = -1; S.pressKind = null; }
+  }
+
+  // electronics
+  if(S.battery <= 0){ S.ep = null; S.awake = false; return; }
+  if(Math.abs(S.p) > 0.05) S.quiet = 0; else S.quiet += dt;
+  S.awake = S.quiet < CFG.sleep;
+
+  const dir = S.p < -0.04 ? 'in' : (S.p > 0.04 ? 'out' : null);
+  if(dir){
+    if(!S.ep || S.ep.type !== dir){
+      endEp();
+      S.ep = {type:dir, peak:S.p, handled:false, started:false, below:0};
+    }
+    const e = S.ep;
+    if(dir === 'in'){
+      e.peak = Math.min(e.peak, S.p);
+      if(!e.handled){
+        if(S.p < -CFG.thr){
+          e.below += dt;
+          if(!e.started){
+            e.started = true; flowReset(); flowStep(1);
+            log('Pressure drop ' + fmt(S.p) + ' past threshold. Validating\u2026','info');
+          }
+          if(e.below >= CFG.validate){ e.handled = true; attemptFire(); }
+        } else if(e.started){
+          reject('Brief dip (' + Math.round(e.below*1000) + ' ms) rejected. A cough or sniff is not an inhalation.');
+        }
+      }
+    } else {
+      e.peak = Math.max(e.peak, S.p);
+      if(!e.handled && S.p > CFG.thr){
+        e.handled = true; mark('rej');
+        log('Pressure rise ' + fmt(S.p) + ': wrong direction, ignored','warn');
+        verdict('Blow ignored. Only a pressure drop (an inhalation) can fire the device.','warn');
+      }
+    }
+  } else if(Math.abs(S.p) < 0.02){
+    endEp();
+  }
+}
+
+/* ---------- particles ---------- */
+const plumeG = $('plume'), pool = [];
+for(let i=0;i<48;i++){
+  const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  c.setAttribute('r','2.5'); c.setAttribute('fill','var(--teal)'); c.setAttribute('opacity','0');
+  plumeG.appendChild(c); pool.push({el:c,on:false,x:0,y:0,vx:0,vy:0,life:0,max:1,r:2});
+}
+function spawn(){
+  const c = pool.find(c => !c.on); if(!c) return;
+  Object.assign(c,{on:true,x:204,y:362+(Math.random()-.5)*5,vx:110+Math.random()*120,vy:(Math.random()-.5)*30,life:0,max:.9+Math.random()*.7,r:1.6+Math.random()*2.4});
+}
+function updatePlume(dt){
+  if(S.plumeEmit > 0){ S.plumeEmit -= dt; const n = Math.ceil(dt*220); for(let i=0;i<n;i++) spawn(); }
+  pool.forEach(c => {
+    if(!c.on) return;
+    c.life += dt; c.x += c.vx*dt; c.y += c.vy*dt;
+    if(c.x < 366) c.y = Math.max(352, Math.min(378, c.y));
+    if(c.life >= c.max){ c.on = false; c.el.setAttribute('opacity','0'); return; }
+    c.el.setAttribute('cx', c.x.toFixed(1)); c.el.setAttribute('cy', c.y.toFixed(1));
+    c.el.setAttribute('r', c.r.toFixed(1));
+    c.el.setAttribute('opacity', (0.85*(1-c.life/c.max)).toFixed(2));
+  });
+}
+
+/* ---------- rendering ---------- */
+let dashOff = 0;
+function render(dt){
+  const off = pressOffset(S.pressT);
+  $('canister').setAttribute('transform','translate(0 '+off.toFixed(2)+')');
+  $('plunger').setAttribute('transform','translate(0 '+(S.pressKind==='auto'?off:0).toFixed(2)+')');
+  $('solBody').classList.toggle('on', S.pressT>=0 && S.pressKind==='auto' && S.pressT<0.2);
+  $('handTxt').setAttribute('opacity', (S.pressT>=0 && S.pressKind==='manual') ? '1' : '0');
+
+  // airflow
+  const fp = $('flowPath'), mag = Math.abs(S.p);
+  if(mag > 0.04){
+    dashOff += (S.p < 0 ? -1 : 1) * mag * 90 * dt;
+    fp.setAttribute('stroke-dashoffset', dashOff.toFixed(1));
+    fp.setAttribute('stroke', S.p < 0 ? 'var(--teal)' : 'var(--amber)');
+    fp.setAttribute('opacity', Math.min(1, mag/0.5).toFixed(2));
+  } else fp.setAttribute('opacity','0');
+  const sr = $('sensorRing');
+  sr.setAttribute('stroke', S.p < 0 ? 'var(--lime)' : 'var(--amber)');
+  sr.setAttribute('opacity', mag > 0.04 ? Math.min(1, mag/0.5).toFixed(2) : '0');
+
+  // battery
+  const bf = $('batFill'), b = Math.max(0, S.battery);
+  bf.setAttribute('width', (50*b/100).toFixed(1));
+  bf.setAttribute('fill', b<=0 ? 'var(--red)' : b<=20 ? 'var(--amber)' : 'var(--green)');
+
+  // OLED
+  const on = S.battery > 0;
+  let v = null;
+  if(on){
+    if(S.blocked && S.T < S.blockUntil) v = {l1:S.blocked.txt,l2:S.blocked.sub,warn:true};
+    else if(S.shown <= 0) v = {l1:'EMPTY',l2:'refill now',warn:true};
+    else {
+      const cyc = [{l1:'~'+S.shown,l2:'doses left',warn:false}];
+      if(S.shown <= CFG.low) cyc.push({l1:'LOW',l2:'refill soon',warn:true});
+      if(S.today > CFG.heavy) cyc.push({l1:'HEAVY',l2:'get help',warn:true});
+      v = cyc[Math.floor(S.T/0.9) % cyc.length];
+    }
+  }
+  const g = $('oledG'), l1 = $('oledL1'), l2 = $('oledL2');
+  if(v){
+    setText(l1, v.l1); setText(l2, v.l2);
+    l1.setAttribute('font-size', v.l1.length<=4 ? '15' : '11');
+    l1.classList.toggle('warn', v.warn); l2.classList.toggle('warn', v.warn);
+    setText($('oledBat'), S.battery <= 20 ? 'LOW BAT' : '');
+    g.setAttribute('opacity', (S.awake || v.warn || S.T < S.ledUntil) ? '1' : '0.5');
+  } else { setText(l1,''); setText(l2,''); setText($('oledBat'),''); g.setAttribute('opacity','1'); }
+  $('esp').setAttribute('opacity', on ? (S.awake ? '1' : '0.65') : '0.3');
+
+  // LED
+  const led = $('led'), ring = $('ledRing');
+  let col = null;
+  if(on && S.T < S.ledUntil) col = S.ledColor==='green' ? 'var(--green)' : 'var(--amber)';
+  else if(on && S.shown <= 0 && Math.floor(S.T/0.5)%2===0) col = 'var(--red)';
+  led.setAttribute('fill', col || 'var(--metal-line)');
+  ring.setAttribute('fill', col || 'var(--metal-line)');
+  ring.setAttribute('opacity', col ? '0.35' : '0');
+
+  // chips
+  let st, cls;
+  const rem = CFG.lockout - (S.T - S.lastFire);
+  if(S.battery <= 0){ st='Device off: battery empty'; cls='off'; }
+  else if(S.pressT>=0 && S.pressKind==='auto'){ st='Firing solenoid'; cls='fire'; }
+  else if(S.ep && S.ep.type==='in' && S.ep.started && !S.ep.handled){ st='Validating breath\u2026'; cls='val'; }
+  else if(rem > 0 && S.total > 0){ st='Lockout: ' + rem.toFixed(1) + ' s'; cls='lock'; }
+  else if(S.awake){ st='Awake, listening'; cls='awake'; }
+  else { st='Asleep: wakes on pressure change'; cls=''; }
+  setText($('stateTxt'), st); $('stateChip').className = 'chip ' + cls;
+  setText($('sensorChip'), 'Sensor ' + fmt(S.p));
+  renderFlow();
+  updatePlume(dt);
+  drawChart();
+}
+
+/* chart */
+let colCache = null, colFrame = 0;
+function cols(){
+  if(!colCache || (++colFrame % 40) === 0){
+    const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue(n).trim();
+    colCache = {teal:g('--teal'),lime:g('--lime'),muted:g('--muted'),line:g('--line'),red:g('--red'),amber:g('--amber'),green:g('--green'),ink:g('--ink')};
+  }
+  return colCache;
+}
+function drawChart(){
+  const cv = $('chart'), dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight; if(!w || !h) return;
+  if(cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
+  const c = cols(), WIN = 6, yMin = -1.1, yMax = 1.3, pL = 40, pR = 8, pT = 10, pB = 8;
+  const X = t => pL + (t-(S.T-WIN))/WIN*(w-pL-pR), Y = v => pT + (yMax-v)/(yMax-yMin)*(h-pT-pB);
+  g.globalAlpha = .16; g.fillStyle = c.lime; g.fillRect(pL, Y(-CFG.thr), w-pL-pR, Y(yMin)-Y(-CFG.thr)); g.globalAlpha = 1;
+  g.font = '10px system-ui,sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'right';
+  [[1,'+1.0'],[0,'0'],[-1,'\u22121.0']].forEach(([v,l]) => {
+    g.strokeStyle = c.line; g.lineWidth = v===0 ? 1.5 : 1; g.beginPath(); g.moveTo(pL,Y(v)); g.lineTo(w-pR,Y(v)); g.stroke();
+    g.fillStyle = c.muted; g.fillText(l, pL-5, Y(v));
+  });
+  g.setLineDash([5,4]); g.strokeStyle = c.green; g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(pL,Y(-CFG.thr)); g.lineTo(w-pR,Y(-CFG.thr)); g.stroke(); g.setLineDash([]);
+  g.fillStyle = c.green; g.textAlign = 'left'; g.fillText('fire threshold \u22120.20', pL+6, Y(-CFG.thr)+10);
+  g.fillStyle = c.muted; g.fillText('exhale \u2191', pL+6, Y(1.15)); g.fillText('inhale \u2193', pL+6, Y(-1.0));
+  // marks
+  S.marks.forEach(m => {
+    const x = X(m.t); if(x < pL) return;
+    const col = m.type==='fire' ? c.green : m.type==='block' ? c.amber : c.red;
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.moveTo(x,pT); g.lineTo(x,h-pB); g.stroke();
+    g.fillStyle = col; g.textAlign = 'left';
+    g.fillText(m.type==='fire' ? 'DOSE' : '\u2715', x+4, pT+8);
+  });
+  // trace
+  g.strokeStyle = c.teal; g.lineWidth = 2.5; g.lineJoin = 'round'; g.beginPath();
+  S.hist.forEach((pt,i) => { const x = X(pt.t), y = Y(pt.p); i ? g.lineTo(x,y) : g.moveTo(x,y); }); g.stroke();
+}
+
+/* ---------- inputs ---------- */
+function holdBtn(btn, mode){
+  const down = e => { e.preventDefault(); try{btn.setPointerCapture(e.pointerId);}catch(_){} S.hold = mode; btn.classList.add('active'); };
+  const up = () => { if(S.hold === mode) S.hold = null; btn.classList.remove('active'); };
+  btn.addEventListener('pointerdown', down);
+  ['pointerup','pointercancel','lostpointercapture'].forEach(ev => btn.addEventListener(ev, up));
+  btn.addEventListener('contextmenu', e => e.preventDefault());
+}
+holdBtn($('bIn'),'in'); holdBtn($('bOut'),'out');
+
+function runScript(steps, intro){ S.hold = null; S.script = {i:0, el:0, steps}; log('TEST: ' + intro, 'info'); verdict('Running test: ' + intro, 'info'); }
+const COUGH = [{d:.16,t:1.1,tau:.03},{d:.05,t:-.45,tau:.02},{d:.5,t:0,tau:.05}];
+const BLOW  = [{d:1.0,t:.8,tau:.12},{d:.5,t:0,tau:.1}];
+const DOUBLE= [{d:.8,t:-.6,tau:.14},{d:.5,t:0,tau:.1},{d:.8,t:-.6,tau:.14},{d:.6,t:0,tau:.1}];
+$('bCough').addEventListener('click', () => runScript(COUGH, 'you cough'));
+$('tCough').addEventListener('click', () => runScript(COUGH, 'cough, a sharp blow then a brief gasp'));
+$('tBlow').addEventListener('click', () => runScript(BLOW, 'blowing into the mouthpiece'));
+$('tDouble').addEventListener('click', () => runScript(DOUBLE, 'two inhales in quick succession'));
+const ATTACK = []; for(let i=0;i<6;i++){ ATTACK.push({d:.8,t:-.6,tau:.14},{d:5.4,t:0,tau:.1}); }
+$('tAttack').addEventListener('click', () => runScript(ATTACK, 'severe attack, six puffs about 6 s apart'));
+$('tBatt').addEventListener('click', () => {
+  setBattery(0);
+  runScript([{d:1.2,t:-.6,tau:.14},{d:.5,t:0,tau:.1}], 'battery dead, patient inhales');
+  verdict('Battery dead: the electronics are off, so the inhale does nothing. Use \u201CPress canister by hand\u201D.', 'warn');
+});
+$('bManual').addEventListener('click', () => {
+  if(S.pressT >= 0) return;
+  S.pressT = 0; S.pressKind = 'manual'; S.released = false;
+});
+
+function setBattery(v){
+  S.battery = v; $('bat').value = v; setText($('batVal'), v + '%');
+  if(v <= 0){ log('Battery empty: electronics off. Manual fallback still works.','bad'); S.ep = null; }
+  else if(v <= 20 && !S.lowBatLogged){ S.lowBatLogged = true; log('Low battery warning (' + v + '%)','warn'); }
+  if(v > 20) S.lowBatLogged = false;
+}
+$('bat').addEventListener('input', e => {
+  const v = +e.target.value; const was = S.battery; S.battery = v; setText($('batVal'), v + '%');
+  if(v <= 0 && was > 0){ log('Battery empty: electronics off. Manual fallback still works.','bad'); S.ep = null; verdict('Battery empty: electronics are off. Press the canister by hand.','warn'); }
+  else if(v <= 20 && v > 0 && !S.lowBatLogged){ S.lowBatLogged = true; log('Low battery warning (' + v + '%)','warn'); }
+  if(v > 20) S.lowBatLogged = false;
+});
+$('eff').addEventListener('input', e => { S.eff = +e.target.value; setText($('effVal'), S.eff.toFixed(2) + ' kPa'); });
+$('bNew').addEventListener('click', () => {
+  S.doses = S.shown = CFG.full; S.blocked = null; log('New canister: counter reset to ' + CFG.full,'info');
+  S.dosesLog.unshift({day:S.day, time:clock(), label:'Canister replaced', left:CFG.full}); verdict('New canister fitted. Counter reset.','info'); renderMC(true);
+});
+$('bLow').addEventListener('click', () => {
+  S.doses = S.shown = 22; S.blocked = null; log('Counter set to 22 for the demo','info'); verdict('22 doses left. Take 2 more to see the low-dose warning.','info'); renderMC();
+});
+$('bDay').addEventListener('click', () => {
+  S.day++; S.today = 0; S.lastFire = -999; S.blocked = null; log('New day: daily dose count reset','info'); verdict('Next day. The daily count is reset.','info'); renderMC();
+});
+
+// keyboard
+const isCtl = t => t && (t.tagName==='BUTTON' || t.tagName==='INPUT');
+addEventListener('keydown', e => {
+  if(e.repeat || isCtl(e.target)) return;
+  if(e.code==='Space'){ e.preventDefault(); S.hold='in'; $('bIn').classList.add('active'); }
+  else if(e.key==='b' || e.key==='B'){ S.hold='out'; $('bOut').classList.add('active'); }
+});
+addEventListener('keyup', e => {
+  if(e.code==='Space'){ if(S.hold==='in') S.hold=null; $('bIn').classList.remove('active'); }
+  else if(e.key==='b' || e.key==='B'){ if(S.hold==='out') S.hold=null; $('bOut').classList.remove('active'); }
+});
+addEventListener('blur', () => { S.hold = null; $('bIn').classList.remove('active'); $('bOut').classList.remove('active'); });
+
+/* ---------- loop ---------- */
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(0.05, Math.max(0.001, (now-last)/1000)); last = now;
+  tick(dt); render(dt); requestAnimationFrame(frame);
+}
+log('Boot. Sensor calibrated, waiting for a breath.','info');
+renderMC();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
